@@ -25,13 +25,13 @@ class AggressiveSwingTrader:
         self.tracker = AggressivePerformanceTracker(self.config)
         self.logger = self._setup_logging()
         
-        # Options scanner (scan only, no execution)
-        # self.options_scanner = OptionsScanner(self.config.POLYGON_API_KEY)  # Removed - file deleted
-        # self.options_alerter = OptionsAlertSystem(self.options_scanner, ['console', 'log'])  # Removed
         self.options_symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'SPY', 'QQQ', 'IWM', 'AMZN', 'MSFT', 'GOOGL']
-        
+
         # Options TRADER (80% probability, 10% allocation, 25% SL / 50% TP)
         self.options_trader = OptionsTrader(self.config)
+
+        # Options alerter (90%+ probability, alert only - reuses options_trader as scanner)
+        self.options_alerter = OptionsAlertSystem(self.options_trader, ['console', 'log'])
         self.options_active = True  # Enable automatic options trading
         
         # SELF-IMPROVING STRATEGY - Adaptive execution based on outcomes
@@ -99,6 +99,8 @@ class AggressiveSwingTrader:
         is_post_market = post_market_start <= current_time < post_market_end
         
         return is_pre_market or is_post_market
+
+    def is_market_open(self):
         """Check if market is open"""
         try:
             clock = self.engine.api.get_clock()
@@ -110,15 +112,41 @@ class AggressiveSwingTrader:
             now = datetime.now()
             weekday = now.weekday()
             current_time = now.time()
-            
+
             if weekday >= 5:  # Weekend
                 return False
-            
+
             open_time = datetime.strptime("09:30", "%H:%M").time()
             close_time = datetime.strptime("16:00", "%H:%M").time()
-            
+
             return open_time <= current_time <= close_time
     
+    def _get_market_conditions(self):
+        """Fetch real VIX and SPY data for market regime detection"""
+        try:
+            import yfinance as yf
+            vix = yf.Ticker("^VIX").history(period="2d")
+            spy = yf.Ticker("SPY").history(period="2d")
+
+            vix_value = float(vix['Close'].iloc[-1]) if not vix.empty else 20.0
+            if len(spy) >= 2:
+                spy_change_pct = float(
+                    (spy['Close'].iloc[-1] - spy['Close'].iloc[-2]) / spy['Close'].iloc[-2] * 100
+                )
+                volume_ratio = float(spy['Volume'].iloc[-1] / spy['Volume'].iloc[-2]) if spy['Volume'].iloc[-2] > 0 else 1.0
+            else:
+                spy_change_pct = 0.0
+                volume_ratio = 1.0
+
+            return {
+                'vix': vix_value,
+                'spy_change_pct': spy_change_pct,
+                'volume_ratio': volume_ratio,
+            }
+        except Exception as e:
+            self.logger.warning(f"Could not fetch market conditions: {e}, using defaults")
+            return {'vix': 20.0, 'spy_change_pct': 0.0, 'volume_ratio': 1.0}
+
     def aggressive_morning_scan(self):
         """Aggressive morning scan and trade execution (pre-market at 7:00 AM)"""
         self.logger.info("PRE-MARKET AGGRESSIVE SCAN (7:00 AM)")
@@ -168,12 +196,8 @@ class AggressiveSwingTrader:
         account = self.engine.api.get_account()
         portfolio_value = float(account.equity)
         
-        # Detect market regime
-        market_data = {
-            'vix': 20,  # Placeholder - should get real VIX
-            'spy_change_pct': 0.5,  # Placeholder
-            'volume_ratio': 1.2
-        }
+        # Detect market regime using real market data
+        market_data = self._get_market_conditions()
         
         if self.adaptive_trading:
             regime = self.self_improving.detect_market_regime(market_data)

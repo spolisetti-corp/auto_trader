@@ -40,6 +40,7 @@ class AggressiveSwingConfig:
         self.QUARTERLY_PROFIT_TARGET = 0.875
         self.QUARTERLY_MAX_LOSS = 0.20
         self.MONTHLY_PROFIT_TARGET = 0.29
+        self.WEEKLY_TARGET = round(self.MONTHLY_PROFIT_TARGET / 4, 4)  # ~7.25% per week
         self.DAILY_TARGET = 0.015
         
         # High-Growth Sectors
