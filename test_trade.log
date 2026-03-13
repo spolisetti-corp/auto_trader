@@ -1,0 +1,38 @@
+2026-03-10 00:05:59,327 - __main__ - INFO - ============================================================
+2026-03-10 00:05:59,367 - __main__ - INFO - ============================================================
+2026-03-10 00:05:59,934 - swing_trading_engine - INFO - Connected to Alpaca account: 36c00180-1366-47f3-b147-f9226889bec8
+2026-03-10 00:05:59,934 - swing_trading_engine - INFO - Account equity: $100,000.00
+2026-03-10 00:05:59,934 - swing_trading_engine - INFO - Paper trading: True
+2026-03-10 00:05:59,984 - swing_trading_engine - INFO - Current positions: 0
+2026-03-10 00:06:00,050 - swing_trading_engine - INFO - PDT Check - Today: 0/3, 5-day total: 0/3, Can trade: True
+2026-03-10 00:06:00,050 - __main__ - INFO -    Price: $180.00
+2026-03-10 00:06:00,058 - __main__ - INFO -    Shares: 27
+2026-03-10 00:06:00,058 - __main__ - INFO -    Total: $4860.00
+2026-03-10 00:06:00,134 - __main__ - INFO -    Order ID: a8d44fd6-fe9d-4e5d-b7b6-d41140357b8b
+2026-03-10 00:06:00,134 - __main__ - INFO -    Symbol: AAPL
+2026-03-10 00:06:00,134 - __main__ - INFO -    Qty: 27
+2026-03-10 00:06:00,134 - __main__ - INFO -    Side: buy
+2026-03-10 00:06:00,134 - __main__ - INFO -    Status: accepted
+2026-03-10 00:06:02,167 - __main__ - INFO -    Filled Qty: 0
+2026-03-10 00:06:02,167 - __main__ - INFO -    Filled Avg Price: $None
+2026-03-10 00:06:02,196 - __main__ - INFO - ============================================================
+2026-03-10 00:06:02,198 - __main__ - INFO - ============================================================
+2026-03-10 08:27:05,813 - __main__ - INFO - ============================================================
+2026-03-10 08:27:05,816 - __main__ - INFO - ============================================================
+2026-03-10 08:27:06,426 - swing_trading_engine - INFO - Connected to Alpaca account: 36c00180-1366-47f3-b147-f9226889bec8
+2026-03-10 08:27:06,426 - swing_trading_engine - INFO - Account equity: $100,000.00
+2026-03-10 08:27:06,426 - swing_trading_engine - INFO - Paper trading: True
+2026-03-10 08:27:06,455 - swing_trading_engine - INFO - Current positions: 0
+2026-03-10 08:27:06,486 - swing_trading_engine - INFO - PDT Check - Today: 0/3, 5-day total: 0/3, Can trade: True
+2026-03-10 08:27:06,490 - __main__ - INFO -    Price: $180.00
+2026-03-10 08:27:06,491 - __main__ - INFO -    Shares: 27
+2026-03-10 08:27:06,491 - __main__ - INFO -    Total: $4860.00
+2026-03-10 08:27:06,525 - __main__ - INFO -    Order ID: 36a00173-c5dd-4671-86c6-a91204f76155
+2026-03-10 08:27:06,525 - __main__ - INFO -    Symbol: AAPL
+2026-03-10 08:27:06,525 - __main__ - INFO -    Qty: 27
+2026-03-10 08:27:06,525 - __main__ - INFO -    Side: buy
+2026-03-10 08:27:06,525 - __main__ - INFO -    Status: pending_new
+2026-03-10 08:27:08,556 - __main__ - INFO -    Filled Qty: 0
+2026-03-10 08:27:08,556 - __main__ - INFO -    Filled Avg Price: $None
+2026-03-10 08:27:08,581 - __main__ - INFO - ============================================================
+2026-03-10 08:27:08,585 - __main__ - INFO - ============================================================
