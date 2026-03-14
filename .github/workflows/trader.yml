@@ -32,14 +32,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/talib
-          key: talib-0.4.0-${{ runner.os }}-${{ runner.arch }}
+          key: talib-0.6.4-${{ runner.os }}-${{ runner.arch }}
 
       - name: Build TA-Lib C library
         if: steps.cache-talib.outputs.cache-hit != 'true'
         run: |
-          wget -q http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
-          tar -xzf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib
+          wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4
           ./configure --prefix=$HOME/talib
           make -j$(nproc)
           make install
