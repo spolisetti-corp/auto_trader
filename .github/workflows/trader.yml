@@ -16,6 +16,7 @@ jobs:
   trade:
     runs-on: ubuntu-latest
     timeout-minutes: 360   # GitHub Actions hard max per job
+    environment: default
 
     steps:
       - name: Checkout code
