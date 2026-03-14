@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 """
-OPTIONS BACKTEST FOR TODAY (March 10, 2026)
+OPTIONS BACKTEST FOR TODAY (March 14, 2026)
 Shows what options strategies would have been suggested
 """
 
@@ -25,7 +25,7 @@ class OptionsBacktest:
     """
     
     def __init__(self):
-        self.today = datetime(2026, 3, 10)
+        self.today = datetime(2026, 3, 14)
         self.symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'SPY', 'QQQ', 'IWM', 'AMZN', 'MSFT', 'GOOGL']
         
         # Simulated market data for March 10, 2026
