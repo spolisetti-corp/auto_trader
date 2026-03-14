@@ -9,7 +9,7 @@ on:
   workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 env:
-  PYTHON_VERSION: '3.10'
+  PYTHON_VERSION: '3.11'
   TZ: America/New_York   # All schedule times run in ET
 
 jobs:
