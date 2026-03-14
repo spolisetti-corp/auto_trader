@@ -42,6 +42,27 @@ jobs:
             echo "label=Midday (12PM-5:50PM ET)" >> $GITHUB_OUTPUT
           fi
 
+      - name: Verify secrets are set
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          EODHD_API_KEY: ${{ secrets.EODHD_API_KEY }}
+        run: |
+          missing=()
+          [ -z "$APCA_API_KEY_ID" ]     && missing+=("APCA_API_KEY_ID")
+          [ -z "$APCA_API_SECRET_KEY" ] && missing+=("APCA_API_SECRET_KEY")
+          [ -z "$POLYGON_API_KEY" ]     && missing+=("POLYGON_API_KEY")
+          [ -z "$FINNHUB_API_KEY" ]     && missing+=("FINNHUB_API_KEY")
+          [ -z "$EODHD_API_KEY" ]       && missing+=("EODHD_API_KEY")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "ERROR: Missing secrets: ${missing[*]}"
+            echo "Go to repo Settings → Secrets and variables → Actions and add them."
+            exit 1
+          fi
+          echo "All 5 secrets are set."
+
       - name: Run ${{ steps.session.outputs.label }}
         env:
           APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
