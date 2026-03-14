@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 """
-OPTIONS BACKTEST FOR TODAY (March 14, 2026)
+OPTIONS BACKTEST FOR TODAY (March 13, 2026)
 Shows what options strategies would have been suggested
 """
 
@@ -25,110 +25,110 @@ class OptionsBacktest:
     """
     
     def __init__(self):
-        self.today = datetime(2026, 3, 14)
+        self.today = datetime(2026, 3, 13)
         self.symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'SPY', 'QQQ', 'IWM', 'AMZN', 'MSFT', 'GOOGL']
         
-        # Simulated market data for March 10, 2026
+        # Simulated market data for March 13, 2026 (Friday — elevated IV, quad-witching week)
         self.market_data = {
             'AAPL': {
-                'price': 185.50,
-                'change_pct': 2.3,
-                'volume': 45000000,
-                'iv_percentile': 65,
-                'trend': 'bullish',
+                'price': 183.20,
+                'change_pct': -1.8,
+                'volume': 58000000,
+                'iv_percentile': 71,
+                'trend': 'bearish',
                 'support': 180.00,
-                'resistance': 190.00,
-                'news': 'AI chip partnership rumors'
+                'resistance': 188.00,
+                'news': 'iPhone demand softening in China'
             },
             'TSLA': {
-                'price': 245.80,
-                'change_pct': -3.5,
-                'volume': 52000000,
-                'iv_percentile': 78,
+                'price': 238.45,
+                'change_pct': -3.0,
+                'volume': 68000000,
+                'iv_percentile': 82,
                 'trend': 'bearish',
-                'support': 240.00,
-                'resistance': 255.00,
-                'news': 'Delivery numbers miss'
+                'support': 232.00,
+                'resistance': 248.00,
+                'news': 'CEO distraction concerns, Q1 delivery cut'
             },
             'NVDA': {
-                'price': 181.25,
-                'change_pct': 4.2,
-                'volume': 38000000,
-                'iv_percentile': 72,
+                'price': 875.60,
+                'change_pct': 5.1,
+                'volume': 44000000,
+                'iv_percentile': 76,
                 'trend': 'strong_bullish',
-                'support': 170.00,
-                'resistance': 185.00,
-                'news': 'New AI chip announcement'
+                'support': 840.00,
+                'resistance': 900.00,
+                'news': 'Blackwell GPU demand surge, Jensen keynote bullish'
             },
             'AMD': {
-                'price': 178.40,
-                'change_pct': 1.8,
-                'volume': 28000000,
-                'iv_percentile': 68,
+                'price': 172.30,
+                'change_pct': 0.6,
+                'volume': 26000000,
+                'iv_percentile': 63,
                 'trend': 'neutral',
-                'support': 172.00,
-                'resistance': 185.00,
-                'news': 'Data center revenue beat'
+                'support': 165.00,
+                'resistance': 180.00,
+                'news': 'MI300X data center orders steady'
             },
             'SPY': {
-                'price': 598.50,
-                'change_pct': 0.5,
-                'volume': 65000000,
-                'iv_percentile': 55,
+                'price': 592.80,
+                'change_pct': -0.9,
+                'volume': 82000000,
+                'iv_percentile': 61,
                 'trend': 'neutral',
-                'support': 590.00,
-                'resistance': 605.00,
-                'news': 'FED meeting minutes'
+                'support': 585.00,
+                'resistance': 600.00,
+                'news': 'CPI hotter than expected, rate cut hopes fade'
             },
             'QQQ': {
-                'price': 515.30,
-                'change_pct': 1.2,
-                'volume': 42000000,
-                'iv_percentile': 58,
-                'trend': 'bullish',
-                'support': 505.00,
-                'resistance': 525.00,
-                'news': 'Tech sector rotation'
+                'price': 508.75,
+                'change_pct': -0.4,
+                'volume': 55000000,
+                'iv_percentile': 64,
+                'trend': 'neutral',
+                'support': 500.00,
+                'resistance': 518.00,
+                'news': 'Tech mixed on macro headwinds'
             },
             'IWM': {
-                'price': 215.60,
-                'change_pct': -0.8,
-                'volume': 35000000,
-                'iv_percentile': 62,
-                'trend': 'neutral',
-                'support': 210.00,
-                'resistance': 222.00,
-                'news': 'Small cap earnings mixed'
+                'price': 208.90,
+                'change_pct': -2.1,
+                'volume': 48000000,
+                'iv_percentile': 69,
+                'trend': 'bearish',
+                'support': 203.00,
+                'resistance': 215.00,
+                'news': 'Small caps hit hard on rate fears'
             },
             'AMZN': {
-                'price': 178.90,
-                'change_pct': 2.8,
-                'volume': 32000000,
-                'iv_percentile': 64,
+                'price': 182.60,
+                'change_pct': 1.4,
+                'volume': 36000000,
+                'iv_percentile': 59,
                 'trend': 'bullish',
-                'support': 172.00,
-                'resistance': 185.00,
-                'news': 'AWS growth acceleration'
+                'support': 176.00,
+                'resistance': 190.00,
+                'news': 'AWS re:Invent announcements driving cloud growth'
             },
             'MSFT': {
-                'price': 410.25,
-                'change_pct': 1.1,
-                'volume': 22000000,
-                'iv_percentile': 48,
+                'price': 404.10,
+                'change_pct': -0.5,
+                'volume': 24000000,
+                'iv_percentile': 52,
                 'trend': 'neutral',
-                'support': 400.00,
-                'resistance': 420.00,
-                'news': 'Copilot subscriber growth'
+                'support': 396.00,
+                'resistance': 415.00,
+                'news': 'Copilot enterprise adoption expanding'
             },
             'GOOGL': {
-                'price': 172.40,
-                'change_pct': -1.5,
-                'volume': 25000000,
-                'iv_percentile': 56,
+                'price': 169.85,
+                'change_pct': -2.2,
+                'volume': 32000000,
+                'iv_percentile': 67,
                 'trend': 'bearish',
-                'support': 168.00,
-                'resistance': 178.00,
-                'news': 'Search market share concerns'
+                'support': 165.00,
+                'resistance': 175.00,
+                'news': 'DOJ antitrust ruling pressure, ad revenue miss'
             }
         }
     
