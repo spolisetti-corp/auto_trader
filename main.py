@@ -9,16 +9,16 @@ import logging
 import schedule
 import time
 from datetime import datetime, timedelta
-from aggressive_config import config
-from polygon_market_scanner import PolygonMarketScanner
-from swing_trading_engine import SwingTradingEngine
-from aggressive_performance_tracker import AggressivePerformanceTracker
-from options_alerts import OptionsAlertSystem
-from options_trader import OptionsTrader
-from self_improving_strategy import SelfImprovingStrategy
-from backup_recovery import TradingStateManager
-from robust_error_handling import RobustTradingManager
-from monitoring_alerting import TradingAlertSystem
+from config import config
+from core.market_scanner import PolygonMarketScanner
+from core.trading_engine import SwingTradingEngine
+from core.performance_tracker import AggressivePerformanceTracker
+from options.scanner import OptionsAlertSystem
+from options.trader import OptionsTrader
+from core.adaptive_strategy import SelfImprovingStrategy
+from infrastructure.state_manager import TradingStateManager
+from infrastructure.error_handler import RobustTradingManager
+from infrastructure.alerting import TradingAlertSystem
 
 class AggressiveSwingTrader:
     def __init__(self):

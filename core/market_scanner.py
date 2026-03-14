@@ -4,8 +4,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 import logging
-from aggressive_config import config
-from data_redundancy import RedundantDataFeed
+from config import config
+from infrastructure.data_feed import RedundantDataFeed
 
 class PolygonMarketScanner:
     def __init__(self, api_key):

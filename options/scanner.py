@@ -170,7 +170,7 @@ def run_options_monitor(symbols: List[str], interval_minutes: int = 15):
     Run continuous options monitoring
     Scans periodically and sends alerts
     """
-    from aggressive_config import config
+    from config import config
     from options_scanner import OptionsScanner
     
     # Initialize
@@ -212,7 +212,7 @@ def run_options_monitor(symbols: List[str], interval_minutes: int = 15):
 # Quick test function
 def test_options_alert():
     """Test the options alert system"""
-    from aggressive_config import config
+    from config import config
     from options_scanner import OptionsScanner
     
     scanner = OptionsScanner(config.POLYGON_API_KEY)

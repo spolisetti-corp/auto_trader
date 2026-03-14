@@ -350,7 +350,7 @@ class AggressivePerformanceTracker:
 
 def main():
     # Test aggressive performance tracker
-    from aggressive_config import config
+    from config import config
     
     tracker = AggressivePerformanceTracker(config)
     

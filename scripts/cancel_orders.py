@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 """
 CANCEL ALL UNEXECUTED (PENDING) ORDERS
 Clean up any pending orders before live trading
@@ -17,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def cancel_all_pending_orders():
     """Cancel all pending orders on Alpaca paper account"""
-    from swing_trading_engine import SwingTradingEngine
+    from core.trading_engine import SwingTradingEngine
     
     logger.info("=" * 60)
     logger.info("CANCELING ALL PENDING ORDERS")

@@ -546,7 +546,7 @@ class OptionsTrader:
 
 def main():
     """Test options trader"""
-    from aggressive_config import config
+    from config import config
     
     trader = OptionsTrader(config)
     

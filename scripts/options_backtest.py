@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 """
 OPTIONS BACKTEST FOR TODAY (March 10, 2026)
 Shows what options strategies would have been suggested
