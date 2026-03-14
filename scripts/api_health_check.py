@@ -95,10 +95,8 @@ def check_yfinance():
 def main():
     checks = [
         ("Alpaca (paper trading)", check_alpaca),
-        ("Polygon",               check_polygon),
         ("Finnhub",               check_finnhub),
         ("EODHD",                 check_eodhd),
-        ("yfinance (no key)",     check_yfinance),
     ]
 
     print("\n" + "=" * 70)
