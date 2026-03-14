@@ -9,13 +9,14 @@ on:
   workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 env:
-  PYTHON_VERSION: '3.10'
+  PYTHON_VERSION: '3.11'
   TZ: America/New_York   # All schedule times run in ET
 
 jobs:
   trade:
     runs-on: ubuntu-latest
     timeout-minutes: 360   # GitHub Actions hard max per job
+    environment: default
 
     steps:
       - name: Checkout code
@@ -26,29 +27,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-
-      - name: Cache TA-Lib build
-        id: cache-talib
-        uses: actions/cache@v4
-        with:
-          path: ~/talib
-          key: talib-0.4.0-${{ runner.os }}-${{ runner.arch }}
-
-      - name: Build TA-Lib C library
-        if: steps.cache-talib.outputs.cache-hit != 'true'
-        run: |
-          wget -q http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
-          tar -xzf ta-lib-0.4.0-src.tar.gz
-          cd ta-lib
-          ./configure --prefix=$HOME/talib
-          make -j$(nproc)
-          make install
-
-      - name: Install TA-Lib system-wide
-        run: |
-          sudo cp -r ~/talib/lib/* /usr/local/lib/
-          sudo cp -r ~/talib/include/* /usr/local/include/
-          sudo ldconfig
 
       - name: Install Python dependencies
         run: pip install -r requirements.lock
@@ -64,6 +42,27 @@ jobs:
             echo "duration=350" >> $GITHUB_OUTPUT
             echo "label=Midday (12PM-5:50PM ET)" >> $GITHUB_OUTPUT
           fi
+
+      - name: Verify secrets are set
+        env:
+          APCA_API_KEY_ID: ${{ secrets.APCA_API_KEY_ID }}
+          APCA_API_SECRET_KEY: ${{ secrets.APCA_API_SECRET_KEY }}
+          POLYGON_API_KEY: ${{ secrets.POLYGON_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          EODHD_API_KEY: ${{ secrets.EODHD_API_KEY }}
+        run: |
+          missing=()
+          [ -z "$APCA_API_KEY_ID" ]     && missing+=("APCA_API_KEY_ID")
+          [ -z "$APCA_API_SECRET_KEY" ] && missing+=("APCA_API_SECRET_KEY")
+          [ -z "$POLYGON_API_KEY" ]     && missing+=("POLYGON_API_KEY")
+          [ -z "$FINNHUB_API_KEY" ]     && missing+=("FINNHUB_API_KEY")
+          [ -z "$EODHD_API_KEY" ]       && missing+=("EODHD_API_KEY")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "ERROR: Missing secrets: ${missing[*]}"
+            echo "Go to repo Settings → Secrets and variables → Actions and add them."
+            exit 1
+          fi
+          echo "All 5 secrets are set."
 
       - name: Run ${{ steps.session.outputs.label }}
         env:
