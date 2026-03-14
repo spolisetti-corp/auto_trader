@@ -55,6 +55,19 @@ class AggressiveSwingConfig:
         self.SCAN_TIMES = ["07:00", "09:25", "10:30", "14:00", "15:30", "16:05"]
         self.REVIEW_TIMES = ["07:30", "12:00", "15:30", "19:30"]
 
+        # --- ALERTING ---
+        self.ALERT_WEBHOOK_URL = os.getenv('ALERT_WEBHOOK_URL', '')
+        self.ALERT_EMAIL_CONFIG = {
+            'smtp_server': os.getenv('ALERT_SMTP_SERVER', ''),
+            'username': os.getenv('ALERT_EMAIL_USER', ''),
+            'password': os.getenv('ALERT_EMAIL_PASS', ''),
+            'from': os.getenv('ALERT_EMAIL_FROM', ''),
+            'to': os.getenv('ALERT_EMAIL_TO', ''),
+        } if os.getenv('ALERT_EMAIL_USER') else {}
+        self.ENABLE_TRADE_ALERTS = True
+        self.ENABLE_ERROR_ALERTS = True
+        self.ENABLE_DAILY_SUMMARY = True
+
     def validate(self):
         """Enhanced validation for aggressive strategies"""
         errors = []

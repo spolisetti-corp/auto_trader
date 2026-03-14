@@ -5,12 +5,14 @@ from datetime import datetime, timedelta
 import time
 import logging
 from aggressive_config import config
+from data_redundancy import RedundantDataFeed
 
 class PolygonMarketScanner:
     def __init__(self, api_key):
         # Store API key for EODHD requests
         self.api_key = api_key
         self.config = config
+        self.data_feed = RedundantDataFeed(polygon_key=api_key)
         self.logger = logging.getLogger(__name__)
     
     def calculate_rsi(self, prices, period=14):
@@ -94,15 +96,20 @@ class PolygonMarketScanner:
                     # Get historical bars for calculations (last 3 months)
                     hist_url = f"https://eodhd.com/api/eod/{symbol}.US?api_token={self.config.EODHD_API_KEY}&from={from_date}&to={to_date}&fmt=json"
                     hist_response = requests.get(hist_url)
-                    
-                    if hist_response.status_code != 200:
-                        continue
-                    
-                    bars_data = hist_response.json()
-                    if not bars_data:
-                        continue
-                    
-                    bars = pd.DataFrame(bars_data)
+
+                    if hist_response.status_code == 200 and hist_response.json():
+                        bars_data = hist_response.json()
+                        bars = pd.DataFrame(bars_data)
+                    else:
+                        # Fallback to yfinance via RedundantDataFeed
+                        self.logger.warning(f"EODHD historical failed for {symbol}, trying yfinance fallback")
+                        yf_data = self.data_feed.get_stock_data(symbol, period='3mo')
+                        if yf_data is None or not self.data_feed.verify_data_quality(yf_data):
+                            continue
+                        yf_data = yf_data.reset_index()
+                        yf_data.columns = [c.lower() for c in yf_data.columns]
+                        yf_data = yf_data.rename(columns={'date': 'date', 'close': 'close', 'volume': 'volume'})
+                        bars = yf_data
                     
                     momentum_20d = 0
                     momentum_50d = 0
