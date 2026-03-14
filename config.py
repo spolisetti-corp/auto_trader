@@ -6,10 +6,9 @@ load_dotenv()
 
 class AggressiveSwingConfig:
     def __init__(self):
-        # Alpaca & Polygon API Configuration
+        # API Configuration
         self.APCA_API_KEY_ID = os.getenv('APCA_API_KEY_ID')
         self.APCA_API_SECRET_KEY = os.getenv('APCA_API_SECRET_KEY')
-        self.POLYGON_API_KEY = os.getenv('POLYGON_API_KEY')
         self.FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
         self.EODHD_API_KEY = os.getenv('EODHD_API_KEY')
 
@@ -71,8 +70,8 @@ class AggressiveSwingConfig:
     def validate(self):
         """Enhanced validation for aggressive strategies"""
         errors = []
-        if not all([self.APCA_API_KEY_ID, self.APCA_API_SECRET_KEY, self.POLYGON_API_KEY]):
-            errors.append("Missing API Keys in .env")
+        if not all([self.APCA_API_KEY_ID, self.APCA_API_SECRET_KEY, self.FINNHUB_API_KEY, self.EODHD_API_KEY]):
+            errors.append("Missing API Keys (need APCA_API_KEY_ID, APCA_API_SECRET_KEY, FINNHUB_API_KEY, EODHD_API_KEY)")
 
         # R/R Ratio Warning (since your TP < SL)
         rr_ratio = self.AGGRESSIVE_TAKE_PROFIT / self.AGGRESSIVE_STOP_LOSS

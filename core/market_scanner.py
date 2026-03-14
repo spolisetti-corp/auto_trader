@@ -8,11 +8,13 @@ from config import config
 from infrastructure.data_feed import RedundantDataFeed
 
 class PolygonMarketScanner:
-    def __init__(self, api_key):
-        # Store API key for EODHD requests
-        self.api_key = api_key
+    def __init__(self, eodhd_key=None):
+        self.api_key = eodhd_key or config.EODHD_API_KEY
         self.config = config
-        self.data_feed = RedundantDataFeed(polygon_key=api_key)
+        self.data_feed = RedundantDataFeed(
+            eodhd_key=self.api_key,
+            finnhub_key=config.FINNHUB_API_KEY,
+        )
         self.logger = logging.getLogger(__name__)
     
     def calculate_rsi(self, prices, period=14):
@@ -101,15 +103,18 @@ class PolygonMarketScanner:
                         bars_data = hist_response.json()
                         bars = pd.DataFrame(bars_data)
                     else:
-                        # Fallback to yfinance via RedundantDataFeed
-                        self.logger.warning(f"EODHD historical failed for {symbol}, trying yfinance fallback")
-                        yf_data = self.data_feed.get_stock_data(symbol, period='3mo')
-                        if yf_data is None or not self.data_feed.verify_data_quality(yf_data):
+                        # Fallback to Finnhub via RedundantDataFeed
+                        self.logger.warning(f"EODHD historical failed for {symbol}, trying Finnhub fallback")
+                        fallback = self.data_feed._get_finnhub_data(
+                            symbol,
+                            datetime.now() - timedelta(days=90),
+                            datetime.now(),
+                        )
+                        if fallback is None or fallback.empty:
                             continue
-                        yf_data = yf_data.reset_index()
-                        yf_data.columns = [c.lower() for c in yf_data.columns]
-                        yf_data = yf_data.rename(columns={'date': 'date', 'close': 'close', 'volume': 'volume'})
-                        bars = yf_data
+                        fallback = fallback.reset_index()
+                        fallback.columns = [c.lower() for c in fallback.columns]
+                        bars = fallback
                     
                     momentum_20d = 0
                     momentum_50d = 0
@@ -215,7 +220,7 @@ class PolygonMarketScanner:
         return {'price': 0, 'volume': 0, 'change': 0}
 
 def main():
-    scanner = PolygonMarketScanner("utj3oghr1PD1OggLcpvkpUpiP6OQbRYO")
+    scanner = PolygonMarketScanner()
     
     print("🚀 POLYGON SWING TRADING SCANNER")
     print("=" * 60)

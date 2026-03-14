@@ -23,7 +23,7 @@ from infrastructure.alerting import TradingAlertSystem
 class AggressiveSwingTrader:
     def __init__(self):
         self.config = config
-        self.scanner = PolygonMarketScanner(self.config.POLYGON_API_KEY)
+        self.scanner = PolygonMarketScanner(self.config.EODHD_API_KEY)
         self.engine = SwingTradingEngine(paper_trading=True)
         self.tracker = AggressivePerformanceTracker(self.config)
         self.logger = self._setup_logging()
