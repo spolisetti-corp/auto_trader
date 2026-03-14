@@ -83,11 +83,11 @@ def check_yfinance():
     try:
         import yfinance as yf
         ticker = yf.Ticker("AAPL")
-        hist = ticker.history(period="5d")
+        hist = ticker.history(period="1mo")
         if hist.empty:
             return FAIL, "No data returned"
         latest = hist.iloc[-1]
-        return PASS, f"AAPL latest close=${latest['Close']:.2f}  volume={int(latest['Volume']):,}"
+        return PASS, f"AAPL latest close=${latest['Close']:.2f}  volume={int(latest['Volume']):,}  rows={len(hist)}"
     except Exception as e:
         return FAIL, str(e)
 
