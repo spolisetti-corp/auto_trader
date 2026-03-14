@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 import logging
-from aggressive_config import config
+from config import config
 
 class SwingTradingEngine:
     def __init__(self, paper_trading=True):

@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 """
 TEST TRADE EXECUTION
 Place one paper trade to verify system works
@@ -21,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 def place_test_trade():
     """Place one test trade on Alpaca paper account"""
-    from swing_trading_engine import SwingTradingEngine
-    from aggressive_config import config
+    from core.trading_engine import SwingTradingEngine
+    from config import config
     
     logger.info("=" * 60)
     logger.info("🚀 PLACING TEST TRADE")

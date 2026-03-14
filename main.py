@@ -9,13 +9,16 @@ import logging
 import schedule
 import time
 from datetime import datetime, timedelta
-from aggressive_config import config
-from polygon_market_scanner import PolygonMarketScanner
-from swing_trading_engine import SwingTradingEngine
-from aggressive_performance_tracker import AggressivePerformanceTracker
-from options_alerts import OptionsAlertSystem
-from options_trader import OptionsTrader
-from self_improving_strategy import SelfImprovingStrategy
+from config import config
+from core.market_scanner import PolygonMarketScanner
+from core.trading_engine import SwingTradingEngine
+from core.performance_tracker import AggressivePerformanceTracker
+from options.scanner import OptionsAlertSystem
+from options.trader import OptionsTrader
+from core.adaptive_strategy import SelfImprovingStrategy
+from infrastructure.state_manager import TradingStateManager
+from infrastructure.error_handler import RobustTradingManager
+from infrastructure.alerting import TradingAlertSystem
 
 class AggressiveSwingTrader:
     def __init__(self):
@@ -25,13 +28,13 @@ class AggressiveSwingTrader:
         self.tracker = AggressivePerformanceTracker(self.config)
         self.logger = self._setup_logging()
         
-        # Options scanner (scan only, no execution)
-        # self.options_scanner = OptionsScanner(self.config.POLYGON_API_KEY)  # Removed - file deleted
-        # self.options_alerter = OptionsAlertSystem(self.options_scanner, ['console', 'log'])  # Removed
         self.options_symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'SPY', 'QQQ', 'IWM', 'AMZN', 'MSFT', 'GOOGL']
-        
+
         # Options TRADER (80% probability, 10% allocation, 25% SL / 50% TP)
         self.options_trader = OptionsTrader(self.config)
+
+        # Options alerter (90%+ probability, alert only - reuses options_trader as scanner)
+        self.options_alerter = OptionsAlertSystem(self.options_trader, ['console', 'log'])
         self.options_active = True  # Enable automatic options trading
         
         # SELF-IMPROVING STRATEGY - Adaptive execution based on outcomes
@@ -42,6 +45,16 @@ class AggressiveSwingTrader:
         self.is_trading_allowed = True
         self.daily_trades_count = 0
         self.current_positions = {}
+
+        # Enhancement modules
+        self.state_manager = TradingStateManager()
+        self.robust_manager = RobustTradingManager()
+        self.alert_system = TradingAlertSystem(
+            email_config=self.config.ALERT_EMAIL_CONFIG or None,
+            webhook_url=self.config.ALERT_WEBHOOK_URL or None,
+        )
+        # Route circuit-breaker alerts from robust_manager through alert_system
+        self.robust_manager.send_alert = lambda msg: self.alert_system.send_circuit_breaker_alert(msg)
         
     def _setup_logging(self):
         logging.basicConfig(
@@ -75,6 +88,12 @@ class AggressiveSwingTrader:
             self.is_trading_allowed = False
             return False
         
+        # Recover state from a previous session if one exists
+        if self.state_manager.load_previous_state():
+            recovered = self.state_manager.recover_from_crash(self)
+            if recovered:
+                self.logger.info("Recovered positions and state from previous session")
+
         self.logger.info("System initialized successfully")
         return True
     
@@ -99,6 +118,8 @@ class AggressiveSwingTrader:
         is_post_market = post_market_start <= current_time < post_market_end
         
         return is_pre_market or is_post_market
+
+    def is_market_open(self):
         """Check if market is open"""
         try:
             clock = self.engine.api.get_clock()
@@ -110,15 +131,41 @@ class AggressiveSwingTrader:
             now = datetime.now()
             weekday = now.weekday()
             current_time = now.time()
-            
+
             if weekday >= 5:  # Weekend
                 return False
-            
+
             open_time = datetime.strptime("09:30", "%H:%M").time()
             close_time = datetime.strptime("16:00", "%H:%M").time()
-            
+
             return open_time <= current_time <= close_time
     
+    def _get_market_conditions(self):
+        """Fetch real VIX and SPY data for market regime detection"""
+        try:
+            import yfinance as yf
+            vix = yf.Ticker("^VIX").history(period="2d")
+            spy = yf.Ticker("SPY").history(period="2d")
+
+            vix_value = float(vix['Close'].iloc[-1]) if not vix.empty else 20.0
+            if len(spy) >= 2:
+                spy_change_pct = float(
+                    (spy['Close'].iloc[-1] - spy['Close'].iloc[-2]) / spy['Close'].iloc[-2] * 100
+                )
+                volume_ratio = float(spy['Volume'].iloc[-1] / spy['Volume'].iloc[-2]) if spy['Volume'].iloc[-2] > 0 else 1.0
+            else:
+                spy_change_pct = 0.0
+                volume_ratio = 1.0
+
+            return {
+                'vix': vix_value,
+                'spy_change_pct': spy_change_pct,
+                'volume_ratio': volume_ratio,
+            }
+        except Exception as e:
+            self.logger.warning(f"Could not fetch market conditions: {e}, using defaults")
+            return {'vix': 20.0, 'spy_change_pct': 0.0, 'volume_ratio': 1.0}
+
     def aggressive_morning_scan(self):
         """Aggressive morning scan and trade execution (pre-market at 7:00 AM)"""
         self.logger.info("PRE-MARKET AGGRESSIVE SCAN (7:00 AM)")
@@ -129,28 +176,30 @@ class AggressiveSwingTrader:
             self.logger.warning("Trading suspended - limits hit")
             return
         
-        try:
-            # Get aggressive candidates for pre-market
+        def _run():
             candidates = self.scanner.get_swing_candidates()
             self.logger.info(f"Found {len(candidates)} candidates for pre-market")
-            
-            # Filter for aggressive trades
+
             aggressive_trades = self.scanner.filter_swing_trades(candidates, max_trades=self.config.MAX_POSITIONS)
             self.logger.info(f"Qualified pre-market trades: {len(aggressive_trades)}")
-            
-            # Execute trades in extended hours
+
             if aggressive_trades:
                 actions = self.execute_aggressive_trades(aggressive_trades, extended_hours=True)
                 for action in actions:
                     self.logger.info(f"Action: {action}")
             else:
                 self.logger.info("No qualified pre-market trades")
-            
-            # Display current positions
+
             self.display_aggressive_positions()
-            
-        except Exception as e:
-            self.logger.error(f"Error in pre-market scan: {e}")
+
+        result = self.robust_manager.execute_with_retry(_run)
+        if result is None and self.robust_manager.circuit_breaker:
+            if self.config.ENABLE_ERROR_ALERTS:
+                self.alert_system.send_error_alert({
+                    'type': 'CircuitBreaker',
+                    'message': 'Circuit breaker triggered during morning scan',
+                    'system_status': 'HALTED',
+                })
     
     def execute_aggressive_trades(self, aggressive_trades, extended_hours=False):
         """Execute aggressive swing trades with self-improving adaptive parameters"""
@@ -168,12 +217,8 @@ class AggressiveSwingTrader:
         account = self.engine.api.get_account()
         portfolio_value = float(account.equity)
         
-        # Detect market regime
-        market_data = {
-            'vix': 20,  # Placeholder - should get real VIX
-            'spy_change_pct': 0.5,  # Placeholder
-            'volume_ratio': 1.2
-        }
+        # Detect market regime using real market data
+        market_data = self._get_market_conditions()
         
         if self.adaptive_trading:
             regime = self.self_improving.detect_market_regime(market_data)
@@ -257,6 +302,15 @@ class AggressiveSwingTrader:
                     'entry_time': datetime.now(),
                     'extended_hours': extended_hours
                 }
+
+                if self.config.ENABLE_TRADE_ALERTS:
+                    self.alert_system.send_trade_alert({
+                        'symbol': symbol,
+                        'action': 'BUY',
+                        'quantity': shares,
+                        'price': current_price,
+                        'session': 'PRE-MARKET' if extended_hours else 'REGULAR',
+                    })
         
         return actions
     
@@ -265,24 +319,22 @@ class AggressiveSwingTrader:
         self.logger.info("AGGRESSIVE MONITORING")
         self.logger.info("=" * 50)
         
-        try:
-            # Update positions
+        def _run():
             self.engine._update_positions()
-            
-            # Monitor existing positions
             actions = self.manage_aggressive_positions()
-            
             for action in actions:
                 self.logger.info(f"Action: {action}")
-            
-            # Track performance
             self.track_performance()
-            
-            # Display positions
             self.display_aggressive_positions()
-            
-        except Exception as e:
-            self.logger.error(f"Error in aggressive monitoring: {e}")
+
+        result = self.robust_manager.execute_with_retry(_run)
+        if result is None and self.robust_manager.circuit_breaker:
+            if self.config.ENABLE_ERROR_ALERTS:
+                self.alert_system.send_error_alert({
+                    'type': 'CircuitBreaker',
+                    'message': 'Circuit breaker triggered during position monitoring',
+                    'system_status': 'HALTED',
+                })
     
     def manage_aggressive_positions(self):
         """Manage aggressive positions with tight stops"""
@@ -369,8 +421,21 @@ class AggressiveSwingTrader:
                 
                 # Remove from tracking
                 del self.current_positions[symbol]
-                
+
                 self.logger.info(f"Closed {symbol}: {reason} at ${exit_price:.2f} ({pnl:+.1%})")
+
+                # Send SL / TP alert
+                if self.config.ENABLE_TRADE_ALERTS:
+                    alert_payload = {
+                        'symbol': symbol,
+                        'entry_price': position['entry_price'],
+                        'exit_price': exit_price,
+                        'pnl': pnl * 100,
+                    }
+                    if 'Stop' in reason:
+                        self.alert_system.send_stop_loss_alert(alert_payload)
+                    elif 'Profit' in reason:
+                        self.alert_system.send_take_profit_alert(alert_payload)
         
         except Exception as e:
             self.logger.error(f"Error closing position {symbol}: {e}")
@@ -451,7 +516,29 @@ class AggressiveSwingTrader:
                 if report['quarterly_status']['status'] == "LOSS LIMIT HIT":
                     self.logger.error("Quarterly loss limit hit - TRADING SUSPENDED")
                     self.is_trading_allowed = False
-            
+
+            # Send daily summary alert
+            if self.config.ENABLE_DAILY_SUMMARY:
+                try:
+                    account = self.engine.api.get_account()
+                    portfolio_value = float(account.equity)
+                    daily_perf = self.tracker.daily_performance
+                    start_value = daily_perf[-1].get('start_value', portfolio_value) if daily_perf else portfolio_value
+                    daily_return = (portfolio_value - start_value) / start_value * 100 if start_value else 0
+                    from datetime import date, timedelta
+                    next_day = (date.today() + timedelta(days=1)).strftime('%Y-%m-%d')
+                    self.alert_system.send_daily_summary({
+                        'start_value': start_value,
+                        'end_value': portfolio_value,
+                        'return': daily_return,
+                        'trades_count': self.daily_trades_count,
+                        'open_positions': len(self.current_positions),
+                        'win_rate': 0,
+                        'next_day': next_day,
+                    })
+                except Exception as alert_e:
+                    self.logger.warning(f"Could not send daily summary alert: {alert_e}")
+
         except Exception as e:
             self.logger.error(f"Error generating end of day report: {e}")
     
@@ -710,14 +797,17 @@ class AggressiveSwingTrader:
         schedule.every().day.at("17:00").do(self.generate_self_improvement_report)
         schedule.every().day.at("19:00").do(self.generate_self_improvement_report)
         
+        # Auto-save state every 15 minutes
+        schedule.every(15).minutes.do(lambda: self.state_manager.save_current_state(self))
+
         # Initial scans
         self.aggressive_morning_scan()
         self.scan_options_opportunities()
-        
+
         # Initial self-improvement report
         if self.adaptive_trading:
             self.generate_self_improvement_report()
-        
+
         # Run scheduled tasks
         while True:
             try:
@@ -725,6 +815,7 @@ class AggressiveSwingTrader:
                 time.sleep(60)  # Check every minute
             except KeyboardInterrupt:
                 self.logger.info("Shutting down aggressive trading system...")
+                self.state_manager.save_current_state(self)
                 break
             except Exception as e:
                 self.logger.error(f"Error in main loop: {e}")

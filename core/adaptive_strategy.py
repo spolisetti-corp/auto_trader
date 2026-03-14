@@ -492,7 +492,7 @@ def create_self_improving_strategy(config):
 
 if __name__ == "__main__":
     # Test self-improving strategy
-    from aggressive_config import config
+    from config import config
     
     strategy = SelfImprovingStrategy(config)
     

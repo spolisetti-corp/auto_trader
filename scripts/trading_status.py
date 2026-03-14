@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 """Check why no new trades after AAPL"""
 import sys
 import os
-sys.path.append('c:/Users/user/Desktop/ws_finance')
 
 # Force reload config to pick up .env changes
-if 'aggressive_config' in sys.modules:
-    del sys.modules['aggressive_config']
 
-from polygon_market_scanner import PolygonMarketScanner
-from aggressive_config import config
+from core.market_scanner import PolygonMarketScanner
+from config import config
 
 print('CONFIG VALUES AFTER RELOAD:')
 print(f'MIN_VOLUME_RATIO: {config.MIN_VOLUME_RATIO}')

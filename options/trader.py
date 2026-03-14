@@ -69,6 +69,11 @@ class OptionsTrader:
         available = max_allocation - current_exposure
         return max(0, available)
     
+    def scan_for_options_opportunities(self, symbols: List[str]) -> List[Dict]:
+        """Scan for 90%+ probability options opportunities (used by OptionsAlertSystem)"""
+        all_opportunities = self.scan_for_80_percent_opportunities(symbols)
+        return [opp for opp in all_opportunities if opp.get('probability', 0) >= 0.90]
+
     def scan_for_80_percent_opportunities(self, symbols: List[str]) -> List[Dict]:
         """Scan for 80%+ probability options opportunities"""
         opportunities = []
@@ -435,6 +440,7 @@ class OptionsTrader:
                 'probability': opportunity['probability'],
                 'contracts': contracts,
                 'premium_paid': opportunity['premium'],
+                'underlying_price_at_entry': opportunity.get('underlying_price', 0),
                 'max_profit': opportunity['max_profit'] * contracts,
                 'max_loss': max_loss * contracts,
                 'entry_date': datetime.now().isoformat(),
@@ -477,14 +483,35 @@ class OptionsTrader:
                     self.save_positions()
                     continue
                 
-                # Get current option price (simplified - would need real option price)
-                # For now, estimate based on underlying
+                # Estimate current spread premium from underlying price movement
                 ticker = yf.Ticker(symbol)
-                current_price = ticker.history(period='1d')['Close'].iloc[-1]
-                
-                # Check stop loss / take profit (simplified logic)
-                # In reality, you'd check the actual option price
-                pnl_pct = 0  # Would calculate from current option price
+                hist = ticker.history(period='1d')
+                if hist.empty:
+                    continue
+                current_price = hist['Close'].iloc[-1]
+
+                entry_price = position.get('underlying_price_at_entry', 0)
+                entry_premium = position.get('premium_paid', 0)
+                direction = position.get('direction', '')
+
+                if entry_price > 0 and entry_premium > 0:
+                    price_move_pct = (current_price - entry_price) / entry_price
+                    # Approximate net delta: ~0.20 for OTM credit spread
+                    NET_DELTA = 0.20
+                    if 'BULLISH' in direction:
+                        # Put credit spread: profits when underlying rises
+                        spread_change = -NET_DELTA * price_move_pct * entry_price
+                    elif 'BEARISH' in direction:
+                        # Call credit spread: profits when underlying falls
+                        spread_change = NET_DELTA * price_move_pct * entry_price
+                    else:
+                        # Iron condor: loss proportional to absolute move
+                        spread_change = NET_DELTA * abs(price_move_pct) * entry_price
+                    estimated_premium = max(0, entry_premium + spread_change)
+                    # For credit spreads, profit = entry_premium - current_premium
+                    pnl_pct = (entry_premium - estimated_premium) / entry_premium
+                else:
+                    pnl_pct = 0
                 
                 if pnl_pct <= -self.stop_loss_pct:
                     position['status'] = 'STOPPED'
@@ -519,7 +546,7 @@ class OptionsTrader:
 
 def main():
     """Test options trader"""
-    from aggressive_config import config
+    from config import config
     
     trader = OptionsTrader(config)
     

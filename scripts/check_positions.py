@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 """Quick check for new trades"""
 from alpaca.trading.client import TradingClient
-from aggressive_config import config
+from config import config
 
 # Initialize client
 client = TradingClient(config.APCA_API_KEY_ID, config.APCA_API_SECRET_KEY, paper=True)
