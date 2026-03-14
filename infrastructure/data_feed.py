@@ -1,142 +1,165 @@
 """
-MARKET DATA REDUNDANCY SYSTEM
-Proposed enhancement for reliable data feeds
+MARKET DATA FEED — EODHD primary, Finnhub fallback
 """
 
-import yfinance as yf
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import logging
+import os
+
+logger = logging.getLogger(__name__)
+
 
 class RedundantDataFeed:
-    """
-    Multiple data source fallback system
-    """
-    
-    def __init__(self, polygon_key=None):
-        self.polygon_key = polygon_key
-        self.data_sources = {
-            'primary': 'polygon',
-            'fallback_1': 'yfinance',
-            'fallback_2': 'alphavantage'  # If API key available
-        }
+    """EODHD primary data source with Finnhub fallback."""
+
+    def __init__(self, eodhd_key=None, finnhub_key=None):
+        self.eodhd_key = eodhd_key or os.getenv("EODHD_API_KEY", "")
+        self.finnhub_key = finnhub_key or os.getenv("FINNHUB_API_KEY", "")
         self.source_status = {}
-        
-    def get_stock_data(self, symbol, period='1mo'):
-        """
-        Get stock data with automatic fallback
-        """
-        # Try Polygon first
-        if self.polygon_key:
-            try:
-                data = self._get_polygon_data(symbol, period)
-                if data is not None and len(data) > 0:
-                    self.source_status[symbol] = 'polygon'
-                    return data
-            except Exception as e:
-                logging.warning(f"Polygon failed for {symbol}: {e}")
-        
-        # Fallback to Yahoo Finance
-        try:
-            data = self._get_yfinance_data(symbol, period)
-            if data is not None and len(data) > 0:
-                self.source_status[symbol] = 'yfinance'
-                logging.info(f"Using Yahoo Finance for {symbol}")
-                return data
-        except Exception as e:
-            logging.warning(f"Yahoo Finance failed for {symbol}: {e}")
-        
-        # All sources failed
-        logging.error(f"All data sources failed for {symbol}")
-        return None
-    
-    def get_real_time_quote(self, symbol):
-        """
-        Get real-time quote with fallback
-        """
-        # Try Polygon
-        if self.polygon_key:
-            try:
-                quote = self._get_polygon_quote(symbol)
-                if quote:
-                    return quote
-            except:
-                pass
-        
-        # Fallback to Yahoo Finance
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            hist = ticker.history(period='1d', interval='1m')
-            
-            if len(hist) > 0:
-                return {
-                    'symbol': symbol,
-                    'price': hist['Close'].iloc[-1],
-                    'volume': hist['Volume'].iloc[-1],
-                    'timestamp': datetime.now()
-                }
-        except:
-            pass
-        
-        return None
-    
-    def _get_polygon_data(self, symbol, period):
-        """Get data from Polygon.io"""
-        # Implementation would use Polygon API
-        # Simplified version shown
-        pass
-    
-    def _get_yfinance_data(self, symbol, period):
-        """Get data from Yahoo Finance"""
-        try:
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(period=period)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def get_stock_data(self, symbol: str, period: str = "3mo") -> pd.DataFrame | None:
+        """Return OHLCV DataFrame. Tries EODHD first, Finnhub second."""
+        days = self._period_to_days(period)
+        to_date = datetime.now()
+        from_date = to_date - timedelta(days=days)
+
+        data = self._get_eodhd_data(symbol, from_date, to_date)
+        if data is not None and not data.empty:
+            self.source_status[symbol] = "eodhd"
             return data
-        except Exception as e:
-            logging.error(f"YFinance error: {e}")
-            return None
-    
-    def _get_polygon_quote(self, symbol):
-        """Get quote from Polygon"""
-        # Implementation would use Polygon API
-        pass
-    
-    def verify_data_quality(self, data):
-        """
-        Check if data meets quality standards
-        """
-        if data is None or len(data) == 0:
+
+        logger.warning(f"EODHD failed for {symbol}, trying Finnhub")
+        data = self._get_finnhub_data(symbol, from_date, to_date)
+        if data is not None and not data.empty:
+            self.source_status[symbol] = "finnhub"
+            return data
+
+        logger.error(f"All data sources failed for {symbol}")
+        return None
+
+    def get_real_time_quote(self, symbol: str) -> dict | None:
+        """Return real-time quote dict. Tries EODHD first, Finnhub second."""
+        quote = self._get_eodhd_quote(symbol)
+        if quote:
+            return quote
+        return self._get_finnhub_quote(symbol)
+
+    def verify_data_quality(self, data: pd.DataFrame) -> bool:
+        if data is None or data.empty:
             return False
-        
-        # Check for recent data
-        latest_date = data.index[-1]
-        hours_since_update = (datetime.now() - latest_date).total_seconds() / 3600
-        
-        if hours_since_update > 24:
-            logging.warning(f"Data is {hours_since_update:.1f} hours old")
+        if data.isnull().sum().sum() > len(data) * 0.1:
+            logger.warning("Too many missing values in data")
             return False
-        
-        # Check for missing values
-        if data.isnull().sum().sum() > len(data) * 0.1:  # >10% missing
-            logging.warning("Too many missing values in data")
-            return False
-        
         return True
 
-# PROPOSED INTEGRATION:
-# Modify polygon_market_scanner.py:
-#
-# class PolygonMarketScanner:
-#     def __init__(self, api_key):
-#         self.api_key = api_key
-#         self.data_feed = RedundantDataFeed(api_key)
-#     
-#     def get_swing_candidates(self):
-#         # Use redundant data feed
-#         data = self.data_feed.get_stock_data(symbol)
-#         if not self.data_feed.verify_data_quality(data):
-#             logging.warning(f"Poor data quality for {symbol}")
-#             continue
+    # ------------------------------------------------------------------
+    # EODHD
+    # ------------------------------------------------------------------
+
+    def _get_eodhd_data(self, symbol: str, from_date: datetime, to_date: datetime) -> pd.DataFrame | None:
+        try:
+            url = (
+                f"https://eodhd.com/api/eod/{symbol}.US"
+                f"?api_token={self.eodhd_key}"
+                f"&from={from_date.strftime('%Y-%m-%d')}"
+                f"&to={to_date.strftime('%Y-%m-%d')}"
+                f"&fmt=json"
+            )
+            r = requests.get(url, timeout=10)
+            if r.status_code != 200 or not r.json():
+                return None
+            df = pd.DataFrame(r.json())
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.set_index("date")[["open", "high", "low", "close", "volume"]]
+            return df
+        except Exception as e:
+            logger.warning(f"EODHD historical error for {symbol}: {e}")
+            return None
+
+    def _get_eodhd_quote(self, symbol: str) -> dict | None:
+        try:
+            url = f"https://eodhd.com/api/real-time/{symbol}.US?api_token={self.eodhd_key}&fmt=json"
+            r = requests.get(url, timeout=10)
+            if r.status_code != 200:
+                return None
+            d = r.json()
+            price = float(d.get("close") or d.get("previousClose", 0))
+            if price <= 0:
+                return None
+            return {
+                "symbol": symbol,
+                "price": price,
+                "volume": int(d.get("volume", 0)),
+                "change_pct": float(d.get("change_p", 0)),
+                "timestamp": datetime.now(),
+            }
+        except Exception as e:
+            logger.warning(f"EODHD quote error for {symbol}: {e}")
+            return None
+
+    # ------------------------------------------------------------------
+    # Finnhub
+    # ------------------------------------------------------------------
+
+    def _get_finnhub_data(self, symbol: str, from_date: datetime, to_date: datetime) -> pd.DataFrame | None:
+        try:
+            url = (
+                f"https://finnhub.io/api/v1/stock/candle"
+                f"?symbol={symbol}&resolution=D"
+                f"&from={int(from_date.timestamp())}"
+                f"&to={int(to_date.timestamp())}"
+                f"&token={self.finnhub_key}"
+            )
+            r = requests.get(url, timeout=10)
+            d = r.json()
+            if d.get("s") != "ok" or not d.get("t"):
+                return None
+            df = pd.DataFrame({
+                "date": pd.to_datetime(d["t"], unit="s"),
+                "open": d["o"],
+                "high": d["h"],
+                "low": d["l"],
+                "close": d["c"],
+                "volume": d["v"],
+            }).set_index("date")
+            return df
+        except Exception as e:
+            logger.warning(f"Finnhub historical error for {symbol}: {e}")
+            return None
+
+    def _get_finnhub_quote(self, symbol: str) -> dict | None:
+        try:
+            url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={self.finnhub_key}"
+            r = requests.get(url, timeout=10)
+            d = r.json()
+            price = float(d.get("c", 0))
+            if price <= 0:
+                return None
+            prev = float(d.get("pc", price))
+            change_pct = ((price - prev) / prev * 100) if prev else 0
+            return {
+                "symbol": symbol,
+                "price": price,
+                "volume": 0,
+                "change_pct": change_pct,
+                "timestamp": datetime.now(),
+            }
+        except Exception as e:
+            logger.warning(f"Finnhub quote error for {symbol}: {e}")
+            return None
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _period_to_days(period: str) -> int:
+        mapping = {"1d": 1, "5d": 5, "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
+        return mapping.get(period, 90)

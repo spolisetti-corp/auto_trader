@@ -6,7 +6,7 @@ Executes options trades automatically with:
 - 25% stop loss / 50% take profit
 """
 
-import yfinance as yf
+import requests
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -100,61 +100,76 @@ class OptionsTrader:
         return opportunities
     
     def _get_options_data(self, symbol: str) -> Optional[Dict]:
-        """Get options data from Yahoo Finance"""
+        """Get stock quote + options chain via Finnhub."""
         try:
-            ticker = yf.Ticker(symbol)
-            
-            # Get stock data
-            stock_info = ticker.history(period='2d')
-            if len(stock_info) < 2:
+            finnhub_key = os.getenv("FINNHUB_API_KEY", "")
+
+            # Quote
+            quote_url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={finnhub_key}"
+            q = requests.get(quote_url, timeout=10).json()
+            current_price = float(q.get("c", 0))
+            prev_price = float(q.get("pc", current_price))
+            if current_price <= 0:
                 return None
-            
-            current_price = stock_info['Close'].iloc[-1]
-            prev_price = stock_info['Close'].iloc[-2]
-            change_pct = ((current_price - prev_price) / prev_price) * 100
-            
-            # Get options chain
-            options = ticker.option_chain()
-            
-            if options.calls.empty or options.puts.empty:
+            change_pct = ((current_price - prev_price) / prev_price * 100) if prev_price else 0
+
+            # Options chain
+            chain_url = f"https://finnhub.io/api/v1/stock/option-chain?symbol={symbol}&token={finnhub_key}"
+            chain_resp = requests.get(chain_url, timeout=10).json()
+            data = chain_resp.get("data", [])
+            if not data:
                 return None
-            
-            # Estimate IV
-            iv_estimate = self._estimate_iv(options, current_price)
-            
+
+            calls = pd.DataFrame([
+                {"strike": opt["strike"], "lastPrice": opt.get("lastPrice", 0),
+                 "impliedVolatility": opt.get("impliedVolatility", 0)}
+                for d in data for opt in d.get("options", {}).get("CALL", [])
+            ])
+            puts = pd.DataFrame([
+                {"strike": opt["strike"], "lastPrice": opt.get("lastPrice", 0),
+                 "impliedVolatility": opt.get("impliedVolatility", 0)}
+                for d in data for opt in d.get("options", {}).get("PUT", [])
+            ])
+
+            if calls.empty or puts.empty:
+                return None
+
+            iv_estimate = self._estimate_iv_from_df(calls, puts, current_price)
+
             return {
-                'symbol': symbol,
-                'price': current_price,
-                'change_pct': change_pct,
-                'volume': stock_info['Volume'].iloc[-1],
-                'iv_percentile': iv_estimate,
-                'calls': options.calls,
-                'puts': options.puts,
-                'expiration_dates': ticker.options
+                "symbol": symbol,
+                "price": current_price,
+                "change_pct": change_pct,
+                "volume": int(q.get("v", 0)),
+                "iv_percentile": iv_estimate,
+                "calls": calls,
+                "puts": puts,
+                "expiration_dates": [d.get("expirationDate") for d in data],
             }
-            
+
         except Exception as e:
             self.logger.error(f"Error getting data for {symbol}: {e}")
             return None
     
-    def _estimate_iv(self, options, current_price: float) -> float:
-        """Estimate IV percentile from option prices"""
+    def _estimate_iv_from_df(self, calls: pd.DataFrame, puts: pd.DataFrame, current_price: float) -> float:
+        """Estimate IV percentile from Finnhub option DataFrames."""
         try:
-            atm_call = options.calls.iloc[(options.calls['strike'] - current_price).abs().argmin()]
-            atm_put = options.puts.iloc[(options.puts['strike'] - current_price).abs().argmin()]
-            
-            avg_premium = (atm_call['lastPrice'] + atm_put['lastPrice']) / 2
-            
+            atm_call = calls.iloc[(calls["strike"] - current_price).abs().argmin()]
+            atm_put  = puts.iloc[(puts["strike"]  - current_price).abs().argmin()]
+            avg_premium = (atm_call["lastPrice"] + atm_put["lastPrice"]) / 2
             if avg_premium > current_price * 0.15:
                 return 80
             elif avg_premium > current_price * 0.10:
                 return 70
             elif avg_premium > current_price * 0.05:
                 return 60
-            else:
-                return 50
-        except:
+            return 50
+        except Exception:
             return 60
+
+    # Keep old name as alias so nothing else breaks
+    def _estimate_iv(self, options, current_price: float) -> float:
+        return self._estimate_iv_from_df(options.calls, options.puts, current_price)
     
     def _find_best_strategy(self, symbol: str, data: Dict) -> Optional[Dict]:
         """Find best options strategy for 80% probability"""
@@ -484,11 +499,14 @@ class OptionsTrader:
                     continue
                 
                 # Estimate current spread premium from underlying price movement
-                ticker = yf.Ticker(symbol)
-                hist = ticker.history(period='1d')
-                if hist.empty:
+                finnhub_key = os.getenv("FINNHUB_API_KEY", "")
+                q = requests.get(
+                    f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={finnhub_key}",
+                    timeout=10,
+                ).json()
+                current_price = float(q.get("c", 0))
+                if current_price <= 0:
                     continue
-                current_price = hist['Close'].iloc[-1]
 
                 entry_price = position.get('underlying_price_at_entry', 0)
                 entry_premium = position.get('premium_paid', 0)
