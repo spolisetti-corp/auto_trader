@@ -51,7 +51,7 @@ jobs:
           sudo ldconfig
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.lock
 
       - name: Determine session (morning vs midday)
         id: session
