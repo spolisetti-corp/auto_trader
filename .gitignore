@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+
+# Logs
+*.log
+logs/
+
+# Data
+data/
+*.csv
+*.json.bak
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
